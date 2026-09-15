@@ -69,13 +69,15 @@ startup, and ACP behavior remain unchanged.
 
 The path must:
 
-- be an absolute filesystem path according to the current platform;
+- be an absolute filesystem path or a tilde-prefixed home path (`~/...`) according to the current platform;
 - identify an SVG file;
 - be readable by the Zed UI process.
 
-Relative paths and `~` expansion are not supported. Requiring an absolute path
-avoids ambiguous resolution against the settings directory, project root,
-current working directory, or agent executable.
+Tilde (`~`) expansion is supported using `shellexpand::tilde`, consistent with
+the `command` executable path in `CustomAgentServerSettings::Custom`. Relative
+paths (such as `./` or `../`) are not supported to avoid ambiguous resolution
+against the settings directory, project root, current working directory, or agent
+executable.
 
 The Settings UI should expose an optional **Icon Path** field. Saving the form
 must preserve the value when editing an existing custom agent. A non-absolute
@@ -245,3 +247,49 @@ Phase one should include tests for:
 Phase two should additionally test metadata precedence, unsupported metadata,
 URL and size validation, download failures, cache reuse, reconnect updates, and
 remote projects.
+
+## Design Revisions & Discrepancy Record {#custom-agent-icon-revisions}
+
+This section explicitly documents the architectural review refinements and
+differences compared to the original revision of this specification:
+
+### 1. Tilde (`~`) Path Expansion Support
+- **Original Plan**: Forbade all `~` expansion, requiring strict absolute paths
+  like `/Users/...`.
+- **Revision**: Expanded via `shellexpand::tilde`, aligning with how the `command`
+  executable path is handled in `CustomAgentServerSettings::Custom`
+  (`crates/project/src/agent_server_store.rs`). Relative paths (`./`, `../`)
+  remain strictly disallowed.
+- **Rationale**: User home directories vary across machines. Disallowing `~`
+  breaks portability when syncing `settings.json` across multiple workstations
+  (e.g., macOS and Linux laptops). Since `command` already supports `shellexpand::tilde`,
+  supporting it for `icon` eliminates arbitrary user inconsistency while maintaining
+  deterministic resolution.
+
+### 2. Phase Two Offline & Local CLI Agent Icon Support
+- **Original Plan**: Allowed only remote HTTPS URLs (`https://...`).
+- **Revision**: In addition to HTTPS URLs, support data URIs (`data:image/svg+xml;base64,...`)
+  or inline SVG payloads (bounded to 64KB) in `_meta`.
+- **Rationale**: Many custom ACP agents run purely as local command-line tools
+  without external hosting or internet connectivity. Requiring an HTTPS endpoint
+  prevents air-gapped or local-only agents from declaring their icons. Inline
+  data is validated and written directly to the external agent icon cache directory.
+
+### 3. ACP Metadata Location Hierarchy
+- **Original Plan**: Only specified root-level `_meta`.
+- **Revision**: Check `response.agent_info.and_then(|info| info.meta)` first,
+  falling back to root `response.meta`.
+- **Rationale**: In the ACP wire format, `agent_info` represents the agent's
+  implementation identity (`Implementation` struct). Scoping agent presentation
+  metadata to `agent_info` is semantically cleaner and standard across ACP
+  implementations, while checking root `_meta` ensures backward compatibility.
+
+### 4. Shared Icon Download and Cache Infrastructure
+- **Original Plan**: Suggested touching `AgentRegistryStore` or a nearby module.
+- **Revision**: Factor out icon fetching, size/type validation, and disk caching
+  into a shared helper module in `crates/project`, shared between `AgentRegistryStore`
+  and ACP agent runtime self-declaration.
+- **Rationale**: Avoids code duplication and guarantees that Registry icons and
+  ACP-declared icons follow identical cache directory hierarchies, timeouts, and
+  validation semantics.
+
