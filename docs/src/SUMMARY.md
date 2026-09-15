@@ -229,6 +229,7 @@
   - [FreeBSD](./development/freebsd.md)
   - [Using Debuggers](./development/debuggers.md)
   - [Performance](./performance.md)
+  - [Custom Agent Icons](./development/custom-agent-icons.md)
   - [Glossary](./development/glossary.md)
 - [Release Notes](./development/release-notes.md)
 - [Debugging Crashes](./development/debugging-crashes.md)
