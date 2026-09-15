@@ -3570,6 +3570,7 @@ mod tests {
                         path: PathBuf::from("test-agent"),
                         args: Vec::new(),
                         env: HashMap::default(),
+                        icon: None,
                         default_mode: Some("manual".to_string()),
                         default_config_options: HashMap::from_iter([(
                             "mode".to_string(),
